@@ -1,15 +1,34 @@
+// popup.js
+
 let mediaRecorder;
 let recordedChunks = [];
-let stream;
 
-document.getElementById("startRecording").addEventListener("click", startRecording);
+document.getElementById("startRecording").addEventListener("click", () => {
+  chrome.runtime.sendMessage({ action: "startRecording" }, (response) => {
+    if (!response.success) {
+      console.error("Failed to open recording tab");
+    }
+  });
+});
+
 document.getElementById("stopRecording").addEventListener("click", stopRecording);
 
 async function startRecording() {
   try {
-    stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { mediaSource: "screen" },
-      audio: true // This will capture system audio if available
+    const streamId = await getStreamId();
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        mandatory: {
+          chromeMediaSource: "desktop",
+          chromeMediaSourceId: streamId
+        }
+      },
+      video: {
+        mandatory: {
+          chromeMediaSource: "desktop",
+          chromeMediaSourceId: streamId
+        }
+      }
     });
 
     mediaRecorder = new MediaRecorder(stream);
@@ -27,14 +46,30 @@ async function startRecording() {
     mediaRecorder.start();
     updateUI(true);
   } catch (err) {
-    console.error("Error: " + err);
+    console.error("Error:", err);
+    updateUI(false);
   }
+}
+
+function getStreamId() {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({ action: "getStreamId" }, (response) => {
+      console.log("response:getStreamId", response);
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message));
+      } else if (response && response.streamId) {
+        resolve(response.streamId);
+      } else {
+        reject(new Error(response.error || "Failed to get stream ID"));
+      }
+    });
+  });
 }
 
 function stopRecording() {
   if (mediaRecorder && mediaRecorder.state !== "inactive") {
     mediaRecorder.stop();
-    stream.getTracks().forEach((track) => track.stop());
+    recordedChunks = [];
     updateUI(false);
   }
 }
@@ -51,7 +86,6 @@ function downloadRecording() {
   document.body.appendChild(a);
   a.click();
   window.URL.revokeObjectURL(url);
-  recordedChunks = [];
 }
 
 function updateUI(isRecording) {
@@ -64,11 +98,3 @@ function updateUI(isRecording) {
 
 // Initialize UI
 updateUI(false);
-
-function stopRecording() {
-  mediaRecorder.stop();
-  document.getElementById("startRecording").disabled = false;
-  document.getElementById("stopRecording").disabled = true;
-  stream.getTracks().forEach((track) => track.stop());
-  updateUI(false);
-}
