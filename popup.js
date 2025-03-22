@@ -11,7 +11,6 @@ document.getElementById("startRecording").addEventListener("click", () => {
   });
 });
 
-document.getElementById("stopRecording").addEventListener("click", stopRecording);
 
 async function startRecording() {
   try {
@@ -66,14 +65,6 @@ function getStreamId() {
   });
 }
 
-function stopRecording() {
-  if (mediaRecorder && mediaRecorder.state !== "inactive") {
-    mediaRecorder.stop();
-    recordedChunks = [];
-    updateUI(false);
-  }
-}
-
 function downloadRecording() {
   const blob = new Blob(recordedChunks, {
     type: "video/webm"
@@ -90,10 +81,6 @@ function downloadRecording() {
 
 function updateUI(isRecording) {
   document.getElementById("startRecording").disabled = isRecording;
-  document.getElementById("stopRecording").disabled = !isRecording;
-  document.getElementById("recordingStatus").textContent = isRecording
-    ? "Recording..."
-    : "Not recording";
 }
 
 // Initialize UI

@@ -1,18 +1,17 @@
 let mediaRecorder;
 let recordedChunks = [];
-let mixedStream;
 
-window.onload = () => {
-  // Ensure getStreamId and audio stream acquisition are run after DOM and resources are fully loaded
+window.onload = async () => {
+  const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  console.log("Microphone access granted.", micStream);
+  startRecording();
+
   document.getElementById("stopRecording").addEventListener("click", () => {
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
       mediaRecorder.stop();
       updateStatus("Recording stopped.");
     }
   });
-
-  // Start recording immediately on page load
-  startRecording();
 };
 
 async function startRecording() {
@@ -20,25 +19,25 @@ async function startRecording() {
     const streamId = await getStreamId();
 
     // Capture the screen video and system audio
-    const desktopStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        mandatory: {
-          chromeMediaSource: "desktop",
-          chromeMediaSourceId: streamId
+    const desktopStream = await navigator.mediaDevices
+      .getUserMedia({
+        audio: {
+          mandatory: {
+            chromeMediaSource: "desktop",
+            chromeMediaSourceId: streamId
+          }
+        },
+        video: {
+          mandatory: {
+            chromeMediaSource: "desktop",
+            chromeMediaSourceId: streamId
+          }
         }
-      },
-      video: {
-        mandatory: {
-          chromeMediaSource: "desktop",
-          chromeMediaSourceId: streamId
-        }
-      }
-    });
-
-    // Validate if audio track exists
-    if (!desktopStream.getAudioTracks().length) {
-      console.warn("Desktop stream does not contain audio");
-    }
+      })
+      .catch((e) => {
+        console.warn("Desktop audio not available:\n", e);
+        return null;
+      });
 
     // Capture the microphone audio
     const audioStream = await navigator.mediaDevices.getUserMedia({
@@ -46,27 +45,22 @@ async function startRecording() {
       video: false
     });
 
-    // Validate if audio track exists
-    if (!audioStream.getAudioTracks().length) {
-      console.warn("Audio stream does not contain audio");
-    }
-
-    // Create an audio context and merge audio tracks
     const audioContext = new AudioContext();
     const destination = audioContext.createMediaStreamDestination();
 
-    if (desktopStream.getAudioTracks().length) {
+    // Check and connect desktop audio source
+    if (desktopStream && desktopStream.getAudioTracks().length) {
       const desktopAudio = audioContext.createMediaStreamSource(desktopStream);
       desktopAudio.connect(destination);
     }
 
-    if (audioStream.getAudioTracks().length) {
-      const micAudio = audioContext.createMediaStreamSource(audioStream);
-      micAudio.connect(destination);
-    }
+    // Connect microphone audio source
+    const micAudio = audioContext.createMediaStreamSource(audioStream);
+    micAudio.connect(destination);
 
-    mixedStream = new MediaStream([
-      ...desktopStream.getVideoTracks(),
+    // Create the mixed stream
+    const mixedStream = new MediaStream([
+      ...(desktopStream ? desktopStream.getVideoTracks() : []),
       ...destination.stream.getAudioTracks()
     ]);
 
