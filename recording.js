@@ -26,7 +26,9 @@ async function startRecording() {
       if (event.data.size > 0) recordedChunks.push(event.data);
     };
 
-    mediaRecorder.onstop = downloadRecording;
+    mediaRecorder.onstop = () => {
+      downloadRecording();
+    };
 
     mediaRecorder.start();
     updateStatus("Recording...");
@@ -57,6 +59,15 @@ function downloadRecording() {
   document.body.appendChild(a);
   a.click();
   URL.revokeObjectURL(url);
+
+  // Close the tab after initiating the download
+  setTimeout(() => closeCurrentTab(), 1000);
+}
+
+function closeCurrentTab() {
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    chrome.tabs.remove(tabs[0].id);
+  });
 }
 
 function updateStatus(status) {
